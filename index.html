@@ -209,15 +209,197 @@
 </head>
 <body>
 
-  <!-- LOGIN -->
-  <div id="loginBox">
-    <h2>🔐 Iniciar sesión – Tinopal UV v2</h2>
-    <input id="user" type="text" placeholder="Usuario" /><br><br>
-    <input id="pass" type="password" placeholder="Contraseña (solo admin)" /><br><br>
-    <button id="loginBtn">Entrar</button>
-    <button id="guestBtn">Entrar como visitante</button>
-    <p id="loginMsg" class="mono"></p>
-  </div>
+<!-- LOGIN -->
+<div id="loginBox">
+  <h2>Iniciar sesión – Tinopal UV v2</h2>
+  <input id="user" type="text" placeholder="Usuario" /><br><br>
+  <input id="pass" type="password" placeholder="Contraseña" /><br><br>
+  <button id="loginBtn">Entrar</button>
+  <p id="loginMsg" class="mono"></p>
+</div>
+
+<script>
+// ===================== SISTEMA DE LOGIN =====================
+const USERS_KEY = "tinopal_users";
+const CURRENT_KEY = "tinopal_current";
+
+// Inicializa con admin si no existe
+if (!localStorage.getItem(USERS_KEY)) {
+  const defaultUsers = [
+    { user: "admin", pass: "admin123", role: "admin" }
+  ];
+  localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
+}
+
+const userEl = document.getElementById("user");
+const passEl = document.getElementById("pass");
+const msgEl = document.getElementById("loginMsg");
+const loginBox = document.getElementById("loginBox");
+const appEl = document.getElementById("app");
+
+// Función para mostrar la app si hay sesión activa
+if (localStorage.getItem(CURRENT_KEY)) showApp();
+
+// Botón de inicio de sesión
+document.getElementById("loginBtn").onclick = () => {
+  const u = userEl.value.trim();
+  const p = passEl.value.trim();
+  if (!u || !p) {
+    msgEl.textContent = "Completa usuario y contraseña.";
+    return;
+  }
+  const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+  const found = users.find(x => x.user === u && x.pass === p);
+  if (!found) {
+    msgEl.textContent = "Usuario o contraseña incorrectos.";
+    return;
+  }
+  localStorage.setItem(CURRENT_KEY, JSON.stringify(found));
+  showApp();
+};
+
+// Mostrar interfaz según rol
+function showApp() {
+  const current = JSON.parse(localStorage.getItem(CURRENT_KEY) || "{}");
+  loginBox.classList.add("hidden");
+  appEl.classList.remove("hidden");
+
+  // Banner superior
+  const banner = document.createElement("div");
+  banner.id = "userBanner";
+  banner.style = `
+    text-align:right;
+    font-size:13px;
+    color:var(--secondary);
+    margin-bottom:10px;
+  `;
+  banner.innerHTML = `
+    Usuario: <b>${current.user}</b> (${current.role})
+    <button id="logoutBtn" style="
+      margin-left:10px;
+      background:transparent;
+      border:1px solid var(--secondary);
+      color:var(--secondary);
+      border-radius:6px;
+      padding:2px 8px;
+      cursor:pointer;">Cerrar sesión</button>
+  `;
+  appEl.prepend(banner);
+  document.getElementById("logoutBtn").onclick = logout;
+
+  // Si es admin → mostrar panel de gestión
+  if (current.role === "admin") showAdminPanel();
+  else {
+    const panel = document.getElementById("adminPanel");
+    if (panel) panel.remove();
+  }
+}
+
+// Cerrar sesión
+function logout() {
+  localStorage.removeItem(CURRENT_KEY);
+  location.reload();
+}
+
+// Panel de administración
+function showAdminPanel() {
+  if (document.getElementById("adminPanel")) return;
+
+  const panel = document.createElement("div");
+  panel.id = "adminPanel";
+  panel.className = "card";
+  panel.innerHTML = `
+    <h3>Panel de Administración</h3>
+    <p>Crear, editar o eliminar usuarios de operarios.</p>
+    <div class="row" style="margin-bottom:12px;">
+      <div style="flex:1;">
+        <input id="newUser" type="text" placeholder="Nuevo usuario" />
+      </div>
+      <div style="flex:1;">
+        <input id="newPass" type="text" placeholder="Contraseña" />
+      </div>
+      <div style="flex:0;">
+        <button id="addUserBtn">Agregar</button>
+      </div>
+    </div>
+    <div id="userList"></div>
+  `;
+  document.querySelector("#app .row").prepend(panel);
+
+  document.getElementById("addUserBtn").onclick = addUser;
+  updateUserList();
+}
+
+// Crear usuario
+function addUser() {
+  const u = document.getElementById("newUser").value.trim();
+  const p = document.getElementById("newPass").value.trim();
+  if (!u || !p) {
+    alert("Debes ingresar usuario y contraseña.");
+    return;
+  }
+  const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+  if (users.some(x => x.user === u)) {
+    alert("Ese usuario ya existe.");
+    return;
+  }
+  users.push({ user: u, pass: p, role: "operario" });
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  document.getElementById("newUser").value = "";
+  document.getElementById("newPass").value = "";
+  updateUserList();
+}
+
+// Actualizar lista de usuarios
+function updateUserList() {
+  const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]")
+    .filter(x => x.role !== "admin");
+  const listEl = document.getElementById("userList");
+
+  if (users.length === 0) {
+    listEl.innerHTML = "<p class='mono'>No hay usuarios registrados.</p>";
+    return;
+  }
+
+  listEl.innerHTML = `
+    <table>
+      <tr><th>Usuario</th><th>Contraseña</th><th>Acciones</th></tr>
+      ${users.map((u,i)=>`
+        <tr>
+          <td>${u.user}</td>
+          <td>${u.pass}</td>
+          <td>
+            <button data-user="${u.user}" class="editBtn">Editar</button>
+            <button data-user="${u.user}" class="delBtn">Eliminar</button>
+          </td>
+        </tr>`).join("")}
+    </table>
+  `;
+
+  listEl.querySelectorAll(".delBtn").forEach(btn => {
+    btn.onclick = () => {
+      if (!confirm("¿Eliminar este usuario?")) return;
+      let users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+      users = users.filter(x => x.user !== btn.dataset.user);
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+      updateUserList();
+    };
+  });
+
+  listEl.querySelectorAll(".editBtn").forEach(btn => {
+    btn.onclick = () => {
+      const newPass = prompt("Nueva contraseña para " + btn.dataset.user + ":");
+      if (!newPass) return;
+      const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+      const u = users.find(x => x.user === btn.dataset.user);
+      if (u) u.pass = newPass;
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+      updateUserList();
+    };
+  });
+}
+</script>
+
 
   <!-- APLICACIÓN PRINCIPAL -->
   <div id="app" class="hidden">
@@ -992,3 +1174,4 @@ $("dlP").addEventListener("click", async ()=>{
 </script>
 </body>
 </html>
+
