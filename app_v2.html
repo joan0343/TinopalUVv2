@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tinopal UV v2 </title>
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#004a7c">
+  <script>
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("Service Worker registrado correctamente."))
+        .catch(err => console.error("Error al registrar Service Worker:", err));
+    }
+    </script>
+
+    <style>
+    :root {
+    --primary: #004a7c;
+    --secondary: #0077b6;
+    --bg: #f9fafb;
+    --text: #222;
+    --card-bg: #fff;
+    --border: #ddd;
+    --radius: 12px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.05);
+    color-scheme: light dark;
+    }
+
+    @media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #1e1e1e;
+        --text: #f1f1f1;
+        --card-bg: #2a2a2a;
+        --border: #444;
+        --shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    }
+
+    body {
+    font-family: "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 24px auto;
+    max-width: 1200px;
+    line-height: 1.5;
+    }
+
+    h2, h3 {
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 10px;
+    }
+
+    h3 {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin-top: 20px;
+    }
+
+    p, label {
+    font-size: 14px;
+    }
+
+    input, button, select {
+    font-family: inherit;
+    font-size: 14px;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    input[type="text"],
+    input[type="password"] {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+    background: var(--card-bg);
+    color: var(--text);
+    box-sizing: border-box;
+    }
+
+    input[type="range"] {
+    width: 100%;
+    }
+
+    button {
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--secondary);
+    background: var(--secondary);
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    }
+    button:hover:not(:disabled) {
+    background: #005c8e;
+    }
+    button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    }
+
+    .hidden {
+    display: none;
+    }
+
+    .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    flex: 1;
+    min-width: 340px;
+    }
+
+    .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    }
+
+    .mono {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    }
+
+    table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+    }
+
+    th, td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    font-size: 13px;
+    }
+
+    th {
+    background: var(--bg);
+    text-align: left;
+    font-weight: 600;
+    }
+
+    .ok { color: #0a7; }
+    .warn { color: #c85; }
+
+    #loginBox {
+    max-width: 400px;
+    margin: 80px auto;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 32px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    }
+
+    #adminPanel {
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    }
+    #userList div {
+    border-bottom: 1px solid var(--border);
+    padding: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    }
+    #userList button {
+    background: transparent;
+    color: var(--secondary);
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    }
+    #userList button:hover {
+    text-decoration: underline;
+    }
+
+    canvas, video, img {
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    }
+
+    .btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+    }
+    </style>
+
+
+  <!-- Dependencias -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="loginBox">
+    <h2>🔐 Iniciar sesión – Tinopal UV v2</h2>
+    <input id="user" type="text" placeholder="Usuario" /><br><br>
+    <input id="pass" type="password" placeholder="Contraseña (solo admin)" /><br><br>
+    <button id="loginBtn">Entrar</button>
+    <button id="guestBtn">Entrar como visitante</button>
+    <p id="loginMsg" class="mono"></p>
+  </div>
+
+  <!-- APLICACIÓN PRINCIPAL -->
+  <div id="app" class="hidden">
+    <h2>Tinopal UV v2 – Procesamiento tipo HidroReader (solo navegador)</h2>
+    <p id="status" class="mono">Cargando OpenCV.js…</p>
+
+    <div class="row">
+      <div class="card">
+        <h3>1) Cargar o capturar imagen</h3>
+        <input id="file" type="file" accept="image/*" />
+        <div class="btns">
+          <button id="openCam">📸 Abrir cámara</button>
+          <button id="takePic" disabled>📷 Tomar foto</button>
+          <button id="closeCam" disabled>❌ Cerrar cámara</button>
+        </div>
+        <video id="video" class="hidden" autoplay></video>
+
+        <label>Dimensiones folio (mm)</label>
+        <div class="row">
+          <div style="flex:1">
+            <label>Alto (mm)</label>
+            <input id="mmH" type="number" value="76" min="10" max="300" step="1" />
+          </div>
+          <div style="flex:1">
+            <label>Ancho (mm)</label>
+            <input id="mmW" type="number" value="26" min="10" max="200" step="1" />
+          </div>
+        </div>
+
+        <h3 style="margin-top:14px">2) Segmentación (Tinopal UV)</h3>
+
+        <label>Hue min <span id="hminV"></span></label>
+        <input id="hmin" type="range" min="0" max="179" value="70" />
+        <label>Hue max <span id="hmaxV"></span></label>
+        <input id="hmax" type="range" min="0" max="179" value="140" />
+        <label>Sat min <span id="sminV"></span></label>
+        <input id="smin" type="range" min="0" max="255" value="50" />
+        <label>Val min (brillo) <span id="vminV"></span></label>
+        <input id="vmin" type="range" min="0" max="255" value="150" />
+
+        <h3 style="margin-top:14px">3) Filtros</h3>
+        <label>Área mínima (px) <span id="aminV"></span></label>
+        <input id="amin" type="range" min="1" max="200" value="6" />
+        <label>Área máxima (px) <span id="amaxV"></span></label>
+        <input id="amax" type="range" min="200" max="30000" value="5000" step="50" />
+        <label>Aspect ratio máx (filtra líneas) <span id="armaxV"></span></label>
+        <input id="armax" type="range" min="2" max="20" value="8" step="0.5" />
+
+        <div class="btns">
+          <button id="run" disabled>🚀 Procesar</button>
+          <button id="dlX" disabled>⬇️ Excel</button>
+          <button id="dlP" disabled>⬇️ PDF</button>
+          <button id="logout">🔓 Cerrar sesión</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Vista original</h3>
+        <canvas id="cIn"></canvas>
+        <h3>Overlay (máscara + colores)</h3>
+        <canvas id="cOut"></canvas>
+        <h3>Resultados</h3>
+        <div id="res"></div>
+        <h3>Histograma</h3>
+        <canvas id="histCanvas" height="200"></canvas>
+        <h3>Primeras gotas</h3>
+        <div id="table"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ======== VARIABLES GLOBALES ========
+let cvReady = false;
+let imgEl = new Image();
+let last = null; // {summary, droplets, overlayDataURL, histImg}
+let videoStream = null;
+
+// ======== LOGIN ========
+const usersKey = "tinopal_users";
+const currentUserKey = "tinopal_current";
+
+function loadUsers() {
+  return JSON.parse(localStorage.getItem(usersKey) || "[]");
+}
+function saveUsers(u) {
+  localStorage.setItem(usersKey, JSON.stringify(u));
+}
+
+document.getElementById("loginBtn").onclick = () => {
+  const user = userEl.value.trim();
+  const pass = passEl.value.trim();
+  if (user === "admin" && pass === "admin123") {
+    localStorage.setItem(currentUserKey, JSON.stringify({user, role:"admin"}));
+    showApp();
+  } else {
+    msgEl.textContent = "Usuario o clave incorrecta.";
+  }
+};
+
+document.getElementById("guestBtn").onclick = () => {
+  const user = prompt("Nombre visitante:");
+  if (!user) return;
+  const users = loadUsers();
+  users.push({user, role:"guest"});
+  saveUsers(users);
+  localStorage.setItem(currentUserKey, JSON.stringify({user, role:"guest"}));
+  showApp();
+};
+
+document.getElementById("logout").onclick = () => {
+  localStorage.removeItem(currentUserKey);
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+};
+
+const userEl = document.getElementById("user");
+const passEl = document.getElementById("pass");
+const msgEl = document.getElementById("loginMsg");
+
+if (localStorage.getItem(currentUserKey)) showApp();
+
+function showApp() {
+  const current = JSON.parse(localStorage.getItem(currentUserKey) || "{}");
+  
+  // Mostrar la app y ocultar login
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+
+  // Mostrar información del usuario
+  const banner = document.createElement("div");
+  banner.id = "userBanner";
+  banner.style = `
+    text-align: right;
+    font-size: 13px;
+    color: var(--secondary);
+    margin-bottom: 10px;
+  `;
+  banner.textContent = `Usuario: ${current.user} (${current.role === "admin" ? "Administrador" : "Visitante"})`;
+  document.getElementById("app").prepend(banner);
+
+  // Mostrar panel de administración solo si es admin
+  if (current.role === "admin") {
+    showAdminPanel();
+  } else {
+    const existingPanel = document.getElementById("adminPanel");
+    if (existingPanel) existingPanel.remove(); // eliminar si existía
+  }
+}
+
+function showAdminPanel() {
+  if (document.getElementById("adminPanel")) return; // evitar duplicados
+
+  const panel = document.createElement("div");
+  panel.id = "adminPanel";
+  panel.className = "card";
+  panel.innerHTML = `
+    <h3>Panel de Administración</h3>
+    <p>Usuarios visitantes registrados:</p>
+    <div id="userList"></div>
+    <div class="btns">
+      <button id="clearVisitors">Eliminar todos los visitantes</button>
+    </div>
+  `;
+
+  // Insertar panel al inicio de la app
+  document.querySelector("#app .row").prepend(panel);
+
+  $("clearVisitors").onclick = () => {
+    if (confirm("¿Eliminar todos los visitantes registrados?")) {
+      localStorage.setItem(usersKey, "[]");
+      updateUserList();
+    }
+  };
+
+  updateUserList();
+}
+
+function updateUserList() {
+  const users = loadUsers().filter(u => u.role === "guest");
+  const container = document.getElementById("userList");
+
+  if (!container) return; // seguridad
+
+  if (!users.length) {
+    container.innerHTML = "<p class='mono'>No hay visitantes registrados.</p>";
+    return;
+  }
+
+  container.innerHTML = users.map((u, i) => `
+    <div class="visitor-row">
+      <span>${i + 1}. ${u.user}</span>
+      <button data-idx="${i}" class="delBtn">Eliminar</button>
+    </div>
+  `).join("");
+
+  container.querySelectorAll(".delBtn").forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.idx);
+      const all = loadUsers();
+      const guests = all.filter(u => u.role === "guest");
+      const toRemove = guests[idx];
+      const filtered = all.filter(u => !(u.user === toRemove.user && u.role === "guest"));
+      saveUsers(filtered);
+      updateUserList();
+    };
+  });
+}
+
+
+function showAdminPanel() {
+  // Crear contenedor si no existe
+  if (!document.getElementById("adminPanel")) {
+    const panel = document.createElement("div");
+    panel.id = "adminPanel";
+    panel.className = "card";
+    panel.innerHTML = `
+      <h3>🧰 Panel de Administración</h3>
+      <p>Usuarios visitantes registrados:</p>
+      <div id="userList"></div>
+      <div class="btns">
+        <button id="clearVisitors">🧹 Eliminar todos</button>
+      </div>
+    `;
+    document.querySelector("#app .row").prepend(panel);
+
+    $("clearVisitors").onclick = () => {
+      if (confirm("¿Eliminar todos los visitantes?")) {
+        localStorage.setItem(usersKey, "[]");
+        updateUserList();
+      }
+    };
+  }
+  updateUserList();
+}
+
+function updateUserList() {
+  const users = loadUsers().filter(u => u.role === "guest");
+  const container = document.getElementById("userList");
+  if (!users.length) {
+    container.innerHTML = "<p class='mono'>No hay visitantes registrados.</p>";
+    return;
+  }
+  container.innerHTML = users.map((u, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <span>${i + 1}. ${u.user}</span>
+      <button data-idx="${i}" class="delBtn">🗑️</button>
+    </div>
+  `).join("");
+
+  container.querySelectorAll(".delBtn").forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.idx);
+      const all = loadUsers();
+      const guests = all.filter(u => u.role === "guest");
+      const toRemove = guests[idx];
+      const filtered = all.filter(u => !(u.user === toRemove.user && u.role === "guest"));
+      saveUsers(filtered);
+      updateUserList();
+    };
+  });
+}
+
+
+// ======== ESTADO Y UTILIDADES ========
+function onOpenCvReady(){
+  cvReady = true;
+  setStatus("OpenCV.js listo ✅", "ok");
+  document.getElementById("run").disabled = false;
+}
+
+function setStatus(msg, cls=""){
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "mono " + (cls||"");
+}
+
+function $(id){ return document.getElementById(id); }
+
+function bindRanges(){
+  const map = [
+    ["hmin","hminV"],["hmax","hmaxV"],["smin","sminV"],["vmin","vminV"],
+    ["amin","aminV"],["amax","amaxV"],["armax","armaxV"]
+  ];
+  map.forEach(([a,b])=>{
+    const ia=$(a), ob=$(b);
+    const upd=()=>ob.textContent="(" + ia.value + ")";
+    ia.addEventListener("input", upd); upd();
+  });
+}
+bindRanges();
+
+$("file").addEventListener("change", (e)=>{
+  const f = e.target.files?.[0];
+  if(!f) return;
+  const url = URL.createObjectURL(f);
+  imgEl.onload = ()=>{
+    drawToCanvas(imgEl, $("cIn"));
+    setStatus("Imagen cargada ✅", "ok");
+    $("run").disabled = false; // 🔥 Activar botón procesar
+  };
+  imgEl.src = url;
+});
+
+
+// ======== CÁMARA (Versión mejorada para móvil y escritorio) ========
+$("openCam").onclick = async () => {
+  try {
+    // Solicita la cámara trasera si está disponible (ideal para móviles)
+    const constraints = {
+      video: {
+        facingMode: { ideal: "environment" }, // preferir cámara trasera
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    };
+
+    // Verifica disponibilidad del API
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Este navegador no soporta acceso a la cámara.");
+      return;
+    }
+
+    // Solicita permiso de cámara
+    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    // Asigna el stream al elemento <video>
+    const videoEl = $("video");
+    videoEl.srcObject = videoStream;
+    videoEl.play();
+
+    // Muestra el video y botones relacionados
+    videoEl.classList.remove("hidden");
+    $("takePic").disabled = false;
+    $("closeCam").disabled = false;
+    setStatus("Cámara activa (usa la trasera si está disponible)", "ok");
+
+  } catch (err) {
+    console.error("Error al acceder a la cámara:", err);
+    if (window.isSecureContext === false) {
+      alert("Para usar la cámara en móvil debes abrir esta app desde una conexión HTTPS (no file://).");
+    } else {
+      alert("No se pudo acceder a la cámara. Revisa los permisos del navegador.");
+    }
+  }
+};
+
+// ======== CAPTURAR FOTO ========
+$("takePic").onclick = () => {
+  const videoEl = $("video");
+  const canvasEl = $("cIn");
+
+  if (!videoEl.srcObject) {
+    alert("Activa la cámara antes de capturar una imagen.");
+    return;
+  }
+
+  // Dibuja el frame del video al canvas
+  canvasEl.width = videoEl.videoWidth;
+  canvasEl.height = videoEl.videoHeight;
+  const ctx = canvasEl.getContext("2d");
+  ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+
+  // Detiene el video (opcional)
+  const tracks = videoStream?.getTracks();
+  tracks?.forEach(t => t.stop());
+  videoEl.srcObject = null;
+
+  videoEl.classList.add("hidden");
+  $("takePic").disabled = true;
+  $("closeCam").disabled = true;
+
+  setStatus("Foto capturada correctamente ✅", "ok");
+  $("run").disabled = false; // habilita el botón procesar
+};
+
+// ======== CERRAR CÁMARA ========
+$("closeCam").onclick = () => {
+  const videoEl = $("video");
+  const tracks = videoStream?.getTracks();
+  tracks?.forEach(t => t.stop());
+  videoEl.srcObject = null;
+  videoEl.classList.add("hidden");
+
+  $("takePic").disabled = true;
+  $("closeCam").disabled = true;
+  setStatus("Cámara cerrada.", "warn");
+};
+
+
+$("takePic").onclick = ()=>{
+  const v = $("video");
+  const c = $("cIn");
+  c.width = v.videoWidth;
+  c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+  setStatus("Foto capturada ✅", "ok");
+  $("run").disabled = false; // 🔥 Activar botón procesar
+};
+
+
+$("closeCam").onclick = ()=>{
+  if(videoStream){
+    videoStream.getTracks().forEach(t=>t.stop());
+    videoStream = null;
+  }
+  $("video").classList.add("hidden");
+  $("takePic").disabled = true;
+  $("closeCam").disabled = true;
+};
+
+// ======== FUNCIONES DE PROCESAMIENTO ========
+function drawToCanvas(img, canvas){
+  const maxW = 900;
+  const scale = Math.min(1, maxW / img.naturalWidth);
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+}
+
+function canvasToMatRGBA(canvas){
+  const ctx = canvas.getContext("2d");
+  const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+  return cv.matFromImageData(imgData);
+}
+
+function fmt(x, nd=2){
+  if(x===null || x===undefined) return "";
+  if(Number.isNaN(x)) return "NaN";
+  return Number(x).toFixed(nd);
+}
+
+function dvVolumeWeighted(d_um, q){
+  if(d_um.length===0) return NaN;
+  const d = d_um.slice().sort((a,b)=>a-b);
+  const vol = d.map(x=>x*x*x);
+  const sum = vol.reduce((a,b)=>a+b,0);
+  let c=0;
+  for(let i=0;i<d.length;i++){
+    c += vol[i]/sum;
+    if(c>=q) return d[i];
+  }
+  return d[d.length-1];
+}
+
+function calcCU(arr){
+  if(arr.length===0) return 0;
+  const mean = arr.reduce((a,b)=>a+b,0)/arr.length;
+  const sumAbs = arr.reduce((a,b)=>a+Math.abs(b-mean),0);
+  return 100*(1 - (sumAbs/(arr.length*mean)));
+}
+
+// ======== OVERLAY CON COLORES ========
+function drawOverlayColor(srcRGBA, droplets){
+  const out = srcRGBA.clone();
+  for (const d of droplets){
+    let color=[255,255,255,255];
+    if(d.d_eq_um<100) continue;
+    if(d.d_eq_um<=500) color=[255,0,0,255]; // rojo
+    else if(d.d_eq_um<=1000) color=[0,0,255,255]; // azul
+    else if(d.d_eq_um<=2000) color=[0,255,0,255]; // verde
+    else color=[128,0,255,255]; // morado
+
+    const center = new cv.Point(d.x+d.w/2, d.y+d.h/2);
+    const radius = Math.max(2, Math.round(Math.sqrt(d.area_px/Math.PI)));
+    cv.circle(out, center, radius, color, 1);
+  }
+  return out;
+}
+
+// ======== HISTOGRAMA ========
+function makeHistogram(diameters){
+  const bins = [0,250,500,750,1000,1500,2000,3000,4000];
+  const counts = Array(bins.length-1).fill(0);
+  for(const d of diameters){
+    for(let i=0;i<bins.length-1;i++){
+      if(d>=bins[i] && d<bins[i+1]) counts[i]++;
+    }
+  }
+  const ctx = $("histCanvas").getContext("2d");
+  new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels: bins.slice(0,-1).map((b,i)=>`${b}-${bins[i+1]} µm`),
+      datasets:[{
+        label:"Distribución de gotas",
+        data: counts
+      }]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+  return $("histCanvas").toDataURL("image/png");
+}
+// ======== BOTÓN PROCESAR ========
+$("run").addEventListener("click", ()=>{
+  if(!cvReady) return;
+  if(!$("cIn").width){ setStatus("Carga o captura una imagen primero.", "warn"); return; }
+
+  setStatus("Procesando…", "");
+  try{
+    const mmH = parseFloat($("mmH").value);
+    const mmW = parseFloat($("mmW").value);
+
+    const Hmin = parseInt($("hmin").value);
+    const Hmax = parseInt($("hmax").value);
+    const Smin = parseInt($("smin").value);
+    const Vmin = parseInt($("vmin").value);
+
+    const Amin = parseInt($("amin").value);
+    const Amax = parseInt($("amax").value);
+    const ARmax = parseFloat($("armax").value);
+
+    // 1) Imagen
+    const srcRGBA = canvasToMatRGBA($("cIn"));
+    const srcBGR = new cv.Mat();
+    cv.cvtColor(srcRGBA, srcBGR, cv.COLOR_RGBA2BGR);
+
+    // 2) HSV + máscara
+    const hsv = new cv.Mat();
+    cv.cvtColor(srcBGR, hsv, cv.COLOR_BGR2HSV);
+    const low = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [Hmin,Smin,Vmin,0]);
+    const high = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [Hmax,255,255,255]);
+    const mask = new cv.Mat();
+    cv.inRange(hsv, low, high, mask);
+
+    // 3) Morfología
+    const k = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3,3));
+    cv.morphologyEx(mask, mask, cv.MORPH_OPEN, k);
+    cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, k);
+
+    // 4) Componentes
+    const cc = new cv.Mat();
+    const stats = new cv.Mat();
+    const cent = new cv.Mat();
+    const n = cv.connectedComponentsWithStats(mask, cc, stats, cent, 8, cv.CV_32S);
+
+    // 5) Escala mm/px
+    const mmPerPxX = mmW / srcRGBA.cols;
+    const mmPerPxY = mmH / srcRGBA.rows;
+    const mmPerPx = (mmPerPxX + mmPerPxY)/2;
+
+    const droplets=[];
+    let areaSumPx=0;
+    for(let i=1;i<n;i++){
+      const x = stats.intPtr(i, cv.CC_STAT_LEFT)[0];
+      const y = stats.intPtr(i, cv.CC_STAT_TOP)[0];
+      const w = stats.intPtr(i, cv.CC_STAT_WIDTH)[0];
+      const h = stats.intPtr(i, cv.CC_STAT_HEIGHT)[0];
+      const area = stats.intPtr(i, cv.CC_STAT_AREA)[0];
+      if(area<Amin) continue;
+      if(area>Amax) continue;
+      const ar = Math.max(w,h)/Math.max(1,Math.min(w,h));
+      if(ar>ARmax && area>(Amin*5)) continue;
+
+      const dPx = 2*Math.sqrt(area/Math.PI);
+      const dUm = dPx*mmPerPx*1000.0;
+      areaSumPx+=area;
+      droplets.push({id:i,area_px:area,x,y,w,h,aspect_ratio:ar,d_eq_um:dUm});
+    }
+    // área total de gotas (mm²)
+    const areaGotas_mm2 = areaSumPx * (mmPerPx ** 2);
+
+    // área folio (mm²)
+    const areaFolio_mm2 = mmW * mmH;
+
+    // cobertura real (%)
+    const coverage = (areaGotas_mm2 / areaFolio_mm2) * 100.0;
+
+    // densidad (gotas/cm²)
+    const folioAreaCm2 = areaFolio_mm2 / 100.0;
+    const N = droplets.length;
+    const density = folioAreaCm2 > 0 ? (N / folioAreaCm2) : NaN;
+
+
+    const dArr=droplets.map(d=>d.d_eq_um);
+    const dmin=dArr.length?Math.min(...dArr):null;
+    const dmax=dArr.length?Math.max(...dArr):null;
+    const dmean=dArr.length?(dArr.reduce((a,b)=>a+b,0)/dArr.length):null;
+    const dv01=dvVolumeWeighted(dArr,0.1);
+    const dv05=dvVolumeWeighted(dArr,0.5);
+    const dv09=dvVolumeWeighted(dArr,0.9);
+    const CU=calcCU(dArr);
+
+    const summary={
+      "Área analizada (cm²)":Number(folioAreaCm2.toFixed(2)),
+      "N impactos":N,
+      "Densidad (gotas/cm²)":Number(density.toFixed(3)),
+      "Cobertura (%)":Number(coverage.toFixed(3)),
+      "Coeficiente de Uniformidad (CU%)":Number(CU.toFixed(2)),
+      "Dmin (µm)":dmin?Number(dmin.toFixed(1)):null,
+      "Dmedio (µm)":dmean?Number(dmean.toFixed(1)):null,
+      "Dmax (µm)":dmax?Number(dmax.toFixed(1)):null,
+      "DV0.1 (µm)":Number(dv01.toFixed(1)),
+      "DV0.5 (µm)":Number(dv05.toFixed(1)),
+      "DV0.9 (µm)":Number(dv09.toFixed(1)),
+      "mm/px (estimado)":Number(mmPerPx.toFixed(5))
+    };
+
+    // 6) Overlay coloreado
+    const outRGBA = drawOverlayColor(srcRGBA, droplets);
+    const canvasOut = $("cOut");
+    canvasOut.width = outRGBA.cols;
+    canvasOut.height = outRGBA.rows;
+    const imgData = new ImageData(new Uint8ClampedArray(outRGBA.data), outRGBA.cols, outRGBA.rows);
+    canvasOut.getContext("2d").putImageData(imgData, 0, 0);
+    const overlayDataURL = canvasOut.toDataURL("image/png");
+
+    // 7) Histograma
+    const histImg = makeHistogram(dArr);
+
+    // 8) Resultados
+    $("res").innerHTML = `
+      <table>
+        ${Object.entries(summary).map(([k,v])=>`<tr><th>${k}</th><td>${v}</td></tr>`).join("")}
+      </table>
+      <p class="mono">
+      DV0.5 ≈ ${summary["DV0.5 (µm)"]} µm — gotas medias.<br>
+      CU ≈ ${summary["Coeficiente de Uniformidad (CU%)"]}% indica ${summary["Coeficiente de Uniformidad (CU%)"]>85?"muy buena":"moderada"} uniformidad.
+      </p>
+    `;
+
+    const top=droplets.slice().sort((a,b)=>a.d_eq_um-b.d_eq_um).slice(0,30);
+    $("table").innerHTML=`
+      <table>
+        <tr><th>#</th><th>Área(px)</th><th>d_eq(µm)</th><th>x</th><th>y</th><th>w</th><th>h</th></tr>
+        ${top.map((d,idx)=>`<tr><td>${idx+1}</td><td>${d.area_px}</td><td>${fmt(d.d_eq_um,1)}</td><td>${d.x}</td><td>${d.y}</td><td>${d.w}</td><td>${d.h}</td></tr>`).join("")}
+      </table>
+    `;
+
+    last={summary,droplets,overlayDataURL,histImg};
+    $("dlX").disabled=false;
+    $("dlP").disabled=false;
+    [srcRGBA,srcBGR,hsv,low,high,mask,k,cc,stats,cent,outRGBA].forEach(m=>m.delete());
+    setStatus("Procesamiento terminado ✅","ok");
+  }catch(err){
+    console.error(err);
+    setStatus("Error: "+(err?.message||err),"warn");
+  }
+});
+
+// ======== DESCARGAR EXCEL ========
+$("dlX").addEventListener("click", ()=>{
+  if(!last) return;
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.json_to_sheet([last.summary]);
+  XLSX.utils.book_append_sheet(wb, ws1, "Resumen");
+  const ws2 = XLSX.utils.json_to_sheet(last.droplets);
+  XLSX.utils.book_append_sheet(wb, ws2, "Gotas");
+  XLSX.writeFile(wb,"Resultados_TinopalUVv2.xlsx");
+});
+
+$("dlP").addEventListener("click", async ()=>{
+  if (!last) return;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+  const marginLeft = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const usableWidth = pageWidth - marginLeft * 2;
+  const lineHeight = 16;
+  let y = 60;
+
+  // === ENCABEZADO ===
+  const now = new Date();
+  const fecha = now.toLocaleDateString();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("INFORME DE PROCESAMIENTO – Tinopal UV v2", marginLeft, y);
+  y += 22;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(`Fecha de generación: ${fecha}`, marginLeft, y);
+  y += 25;
+
+  // === SECCIÓN 1: TABLA DE RESULTADOS ===
+  doc.setFontSize(12);
+  doc.setTextColor(0);
+  doc.text("Resumen de parámetros:", marginLeft, y);
+  y += 10;
+
+  const entries = Object.entries(last.summary);
+  const colW = [200, 100]; // Column widths
+  const rowH = 18;
+  const x1 = marginLeft;
+  const x2 = x1 + colW[0];
+
+  doc.setFontSize(10);
+  doc.setDrawColor(200);
+  doc.setLineWidth(0.5);
+  doc.setFont("helvetica", "normal");
+
+  entries.forEach(([key, val]) => {
+    if (y > 740) {  // Nueva página si se excede
+      doc.addPage();
+      y = 60;
+    }
+    doc.setFillColor(245);
+    doc.rect(x1, y - 10, colW[0] + colW[1], rowH, "S");
+    doc.text(key, x1 + 6, y + 3, { maxWidth: colW[0] - 8 });
+    doc.text(String(val), x2 + 6, y + 3);
+    y += rowH - 2;
+  });
+
+  y += 25;
+
+  // === SECCIÓN 2: IMAGEN DE OVERLAY ===
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Imagen procesada (overlay con clasificación de gotas):", marginLeft, y);
+  y += 10;
+
+  const imgOverlay = new Image();
+  imgOverlay.src = last.overlayDataURL;
+  await new Promise((res) => (imgOverlay.onload = res));
+
+  const imgMaxW = usableWidth;
+  const imgMaxH = 300;
+  const scaleOverlay = Math.min(imgMaxW / imgOverlay.width, imgMaxH / imgOverlay.height);
+  const imgW = imgOverlay.width * scaleOverlay;
+  const imgH = imgOverlay.height * scaleOverlay;
+
+  if (y + imgH > 750) {
+    doc.addPage();
+    y = 60;
+  }
+
+  doc.addImage(last.overlayDataURL, "PNG", marginLeft, y, imgW, imgH);
+  y += imgH + 30;
+
+  // === SECCIÓN 3: HISTOGRAMA ===
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Histograma de distribución de diámetros de gotas:", marginLeft, y);
+  y += 10;
+
+  const imgHist = new Image();
+  imgHist.src = last.histImg;
+  await new Promise((res) => (imgHist.onload = res));
+
+  const histMaxW = usableWidth;
+  const histMaxH = 220;
+  const scaleHist = Math.min(histMaxW / imgHist.width, histMaxH / imgHist.height);
+  const histW = imgHist.width * scaleHist;
+  const histH = imgHist.height * scaleHist;
+
+  if (y + histH > 750) {
+    doc.addPage();
+    y = 60;
+  }
+
+  doc.addImage(last.histImg, "PNG", marginLeft, y, histW, histH);
+  y += histH + 40;
+
+  // === PIE DE PÁGINA ===
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(9);
+    doc.setTextColor(130);
+    doc.text("Tinopal UV v2 – HidroReader Adaptado (solo navegador)", marginLeft, 820);
+    doc.text(`Página ${i} de ${pageCount}`, pageWidth - marginLeft - 60, 820);
+  }
+
+  doc.save(`Informe_TinopalUV_${fecha.replace(/\//g, "-")}.pdf`);
+});
+
+</script>
+</body>
+</html>
