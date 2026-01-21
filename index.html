@@ -198,6 +198,24 @@
     gap: 10px;
     margin-top: 12px;
     }
+        /* === Marco de encuadre para cámara === */
+    #cameraWrapper {
+      position: relative;
+      display: inline-block;
+    }
+
+    #cameraFrame {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60%;
+      aspect-ratio: 76 / 26; /* relación exacta del folio */
+      border: 3px solid rgba(0, 128, 255, 0.8);
+      transform: translate(-50%, -50%);
+      pointer-events: none; /* no bloquea clics */
+      border-radius: 6px;
+    }
+
     </style>
 
 
@@ -209,197 +227,15 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="loginBox">
-  <h2>Iniciar sesión – Tinopal UV v2</h2>
-  <input id="user" type="text" placeholder="Usuario" /><br><br>
-  <input id="pass" type="password" placeholder="Contraseña" /><br><br>
-  <button id="loginBtn">Entrar</button>
-  <p id="loginMsg" class="mono"></p>
-</div>
-
-<script>
-// ===================== SISTEMA DE LOGIN =====================
-const USERS_KEY = "tinopal_users";
-const CURRENT_KEY = "tinopal_current";
-
-// Inicializa con admin si no existe
-if (!localStorage.getItem(USERS_KEY)) {
-  const defaultUsers = [
-    { user: "admin", pass: "admin123", role: "admin" }
-  ];
-  localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
-}
-
-const userEl = document.getElementById("user");
-const passEl = document.getElementById("pass");
-const msgEl = document.getElementById("loginMsg");
-const loginBox = document.getElementById("loginBox");
-const appEl = document.getElementById("app");
-
-// Función para mostrar la app si hay sesión activa
-if (localStorage.getItem(CURRENT_KEY)) showApp();
-
-// Botón de inicio de sesión
-document.getElementById("loginBtn").onclick = () => {
-  const u = userEl.value.trim();
-  const p = passEl.value.trim();
-  if (!u || !p) {
-    msgEl.textContent = "Completa usuario y contraseña.";
-    return;
-  }
-  const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  const found = users.find(x => x.user === u && x.pass === p);
-  if (!found) {
-    msgEl.textContent = "Usuario o contraseña incorrectos.";
-    return;
-  }
-  localStorage.setItem(CURRENT_KEY, JSON.stringify(found));
-  showApp();
-};
-
-// Mostrar interfaz según rol
-function showApp() {
-  const current = JSON.parse(localStorage.getItem(CURRENT_KEY) || "{}");
-  loginBox.classList.add("hidden");
-  appEl.classList.remove("hidden");
-
-  // Banner superior
-  const banner = document.createElement("div");
-  banner.id = "userBanner";
-  banner.style = `
-    text-align:right;
-    font-size:13px;
-    color:var(--secondary);
-    margin-bottom:10px;
-  `;
-  banner.innerHTML = `
-    Usuario: <b>${current.user}</b> (${current.role})
-    <button id="logoutBtn" style="
-      margin-left:10px;
-      background:transparent;
-      border:1px solid var(--secondary);
-      color:var(--secondary);
-      border-radius:6px;
-      padding:2px 8px;
-      cursor:pointer;">Cerrar sesión</button>
-  `;
-  appEl.prepend(banner);
-  document.getElementById("logoutBtn").onclick = logout;
-
-  // Si es admin → mostrar panel de gestión
-  if (current.role === "admin") showAdminPanel();
-  else {
-    const panel = document.getElementById("adminPanel");
-    if (panel) panel.remove();
-  }
-}
-
-// Cerrar sesión
-function logout() {
-  localStorage.removeItem(CURRENT_KEY);
-  location.reload();
-}
-
-// Panel de administración
-function showAdminPanel() {
-  if (document.getElementById("adminPanel")) return;
-
-  const panel = document.createElement("div");
-  panel.id = "adminPanel";
-  panel.className = "card";
-  panel.innerHTML = `
-    <h3>Panel de Administración</h3>
-    <p>Crear, editar o eliminar usuarios de operarios.</p>
-    <div class="row" style="margin-bottom:12px;">
-      <div style="flex:1;">
-        <input id="newUser" type="text" placeholder="Nuevo usuario" />
-      </div>
-      <div style="flex:1;">
-        <input id="newPass" type="text" placeholder="Contraseña" />
-      </div>
-      <div style="flex:0;">
-        <button id="addUserBtn">Agregar</button>
-      </div>
-    </div>
-    <div id="userList"></div>
-  `;
-  document.querySelector("#app .row").prepend(panel);
-
-  document.getElementById("addUserBtn").onclick = addUser;
-  updateUserList();
-}
-
-// Crear usuario
-function addUser() {
-  const u = document.getElementById("newUser").value.trim();
-  const p = document.getElementById("newPass").value.trim();
-  if (!u || !p) {
-    alert("Debes ingresar usuario y contraseña.");
-    return;
-  }
-  const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  if (users.some(x => x.user === u)) {
-    alert("Ese usuario ya existe.");
-    return;
-  }
-  users.push({ user: u, pass: p, role: "operario" });
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  document.getElementById("newUser").value = "";
-  document.getElementById("newPass").value = "";
-  updateUserList();
-}
-
-// Actualizar lista de usuarios
-function updateUserList() {
-  const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]")
-    .filter(x => x.role !== "admin");
-  const listEl = document.getElementById("userList");
-
-  if (users.length === 0) {
-    listEl.innerHTML = "<p class='mono'>No hay usuarios registrados.</p>";
-    return;
-  }
-
-  listEl.innerHTML = `
-    <table>
-      <tr><th>Usuario</th><th>Contraseña</th><th>Acciones</th></tr>
-      ${users.map((u,i)=>`
-        <tr>
-          <td>${u.user}</td>
-          <td>${u.pass}</td>
-          <td>
-            <button data-user="${u.user}" class="editBtn">Editar</button>
-            <button data-user="${u.user}" class="delBtn">Eliminar</button>
-          </td>
-        </tr>`).join("")}
-    </table>
-  `;
-
-  listEl.querySelectorAll(".delBtn").forEach(btn => {
-    btn.onclick = () => {
-      if (!confirm("¿Eliminar este usuario?")) return;
-      let users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-      users = users.filter(x => x.user !== btn.dataset.user);
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      updateUserList();
-    };
-  });
-
-  listEl.querySelectorAll(".editBtn").forEach(btn => {
-    btn.onclick = () => {
-      const newPass = prompt("Nueva contraseña para " + btn.dataset.user + ":");
-      if (!newPass) return;
-      const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-      const u = users.find(x => x.user === btn.dataset.user);
-      if (u) u.pass = newPass;
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      updateUserList();
-    };
-  });
-}
-</script>
-
+  <!-- LOGIN -->
+  <div id="loginBox">
+    <h2>🔐 Iniciar sesión – Tinopal UV v2</h2>
+    <input id="user" type="text" placeholder="Usuario" /><br><br>
+    <input id="pass" type="password" placeholder="Contraseña (solo admin)" /><br><br>
+    <button id="loginBtn">Entrar</button>
+    <button id="guestBtn">Entrar como visitante</button>
+    <p id="loginMsg" class="mono"></p>
+  </div>
 
   <!-- APLICACIÓN PRINCIPAL -->
   <div id="app" class="hidden">
@@ -415,7 +251,11 @@ function updateUserList() {
           <button id="takePic" disabled>📷 Tomar foto</button>
           <button id="closeCam" disabled>❌ Cerrar cámara</button>
         </div>
-        <video id="video" class="hidden" autoplay></video>
+        <div id="cameraWrapper" style="width:100%; position:relative;">
+          <video id="video" class="hidden" autoplay playsinline></video>
+          <div id="cameraFrame" class="hidden"></div>
+        </div>
+
 
         <label>Dimensiones folio (mm)</label>
         <div class="row">
@@ -705,48 +545,64 @@ $("file").addEventListener("change", (e)=>{
 });
 
 
-// ======== CÁMARA (Versión mejorada para móvil y escritorio) ========
+// Mostrar marco al abrir cámara
 $("openCam").onclick = async () => {
-  try {
-    // Solicita la cámara trasera si está disponible (ideal para móviles)
-    const constraints = {
-      video: {
-        facingMode: { ideal: "environment" }, // preferir cámara trasera
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      },
-      audio: false
-    };
-
-    // Verifica disponibilidad del API
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert("Este navegador no soporta acceso a la cámara.");
-      return;
+    try {
+      const constraints = {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      };
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Este navegador no soporta acceso a la cámara.");
+        return;
+      }
+      videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const videoEl = $("video");
+      videoEl.srcObject = videoStream;
+      videoEl.classList.remove("hidden");
+      $("cameraFrame").classList.remove("hidden"); // 🔥 Muestra el recuadro guía
+      $("takePic").disabled = false;
+      $("closeCam").disabled = false;
+      setStatus("Cámara activa. Alinea la tarjeta dentro del recuadro.", "ok");
+    } catch (err) {
+      alert("No se pudo acceder a la cámara. Verifica permisos.");
     }
+  };
 
-    // Solicita permiso de cámara
-    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-
-    // Asigna el stream al elemento <video>
+  // Ocultar marco al cerrar o capturar
+  $("closeCam").onclick = () => {
     const videoEl = $("video");
-    videoEl.srcObject = videoStream;
-    videoEl.play();
+    const tracks = videoStream?.getTracks();
+    tracks?.forEach(t => t.stop());
+    videoEl.srcObject = null;
+    videoEl.classList.add("hidden");
+    $("cameraFrame").classList.add("hidden"); // 🔥 Oculta el marco
+    $("takePic").disabled = true;
+    $("closeCam").disabled = true;
+    setStatus("Cámara cerrada.", "warn");
+  };
 
-    // Muestra el video y botones relacionados
-    videoEl.classList.remove("hidden");
-    $("takePic").disabled = false;
-    $("closeCam").disabled = false;
-    setStatus("Cámara activa (usa la trasera si está disponible)", "ok");
-
-  } catch (err) {
-    console.error("Error al acceder a la cámara:", err);
-    if (window.isSecureContext === false) {
-      alert("Para usar la cámara en móvil debes abrir esta app desde una conexión HTTPS (no file://).");
-    } else {
-      alert("No se pudo acceder a la cámara. Revisa los permisos del navegador.");
-    }
-  }
+  $("takePic").onclick = () => {
+    const videoEl = $("video");
+    const canvasEl = $("cIn");
+    if (!videoEl.srcObject) return;
+    canvasEl.width = videoEl.videoWidth;
+    canvasEl.height = videoEl.videoHeight;
+    const ctx = canvasEl.getContext("2d");
+    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+    const tracks = videoStream?.getTracks();
+    tracks?.forEach(t => t.stop());
+    videoEl.srcObject = null;
+    videoEl.classList.add("hidden");
+    $("cameraFrame").classList.add("hidden"); // 🔥 Oculta el marco al tomar foto
+    setStatus("Foto capturada correctamente ✅", "ok");
+    $("run").disabled = false;
 };
+
 
 // ======== CAPTURAR FOTO ========
 $("takePic").onclick = () => {
@@ -1174,4 +1030,3 @@ $("dlP").addEventListener("click", async ()=>{
 </script>
 </body>
 </html>
-
