@@ -235,7 +235,47 @@
       100% { top: 100%; }
     }
 
+        #takePicWrapper {
+      text-align: center;
+      margin-top: 10px;
+    }
 
+    #takePicWrapper button {
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--secondary);
+      background: var(--secondary);
+      color: #fff;
+      font-weight: 500;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    #takePicWrapper button:hover:not(:disabled) {
+      background: #005c8e;
+    }
+
+    .eye-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      width: 20px;
+      height: 20px;
+      position: relative;
+      padding: 0;
+      outline: none;
+    }
+
+    .eye-icon {
+      width: 18px;
+      height: 18px;
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      stroke: #0077b6;
+      fill: none;
+      stroke-width: 2;
+    }
 
     </style>
 
@@ -248,38 +288,42 @@
 </head>
 <body>
 
-  <!-- LOGIN -->
   <div id="loginBox">
-    <h2>🔐 Iniciar sesión – Tinopal UV v2</h2>
+    <h2>Iniciar sesión – Tinopal UV v2</h2>
     <input id="user" type="text" placeholder="Usuario" /><br><br>
-    <input id="pass" type="password" placeholder="Contraseña (solo admin)" /><br><br>
+    <input id="pass" type="password" placeholder="Contraseña" /><br><br>
     <button id="loginBtn">Entrar</button>
-    <button id="guestBtn">Entrar como visitante</button>
     <p id="loginMsg" class="mono"></p>
   </div>
 
+
   <!-- APLICACIÓN PRINCIPAL -->
   <div id="app" class="hidden">
-    <h2>Tinopal UV v2 – Procesamiento tipo HidroReader (solo navegador)</h2>
-    <p id="status" class="mono">Cargando OpenCV.js…</p>
+    <h2>Tinopal UV v2</h2>
+    <p id="status" class="mono"></p>
 
     <div class="row">
       <div class="card">
         <h3>1) Cargar o capturar imagen</h3>
         <input id="file" type="file" accept="image/*" />
         <div class="btns">
-          <button id="openCam">📸 Abrir cámara</button>
-          <button id="takePic" disabled>📷 Tomar foto</button>
-          <button id="closeCam" disabled>❌ Cerrar cámara</button>
+          <button id="openCam">Abrir cámara</button>
+          <button id="closeCam" disabled>Cerrar cámara</button>
         </div>
 
-        <!-- Contenedor de cámara y recuadro escáner -->
+        <!-- Contenedor de cámara con recuadro -->
         <div id="cameraWrapper">
           <video id="video" class="hidden" autoplay playsinline></video>
           <div id="cameraFrame" class="hidden">
             <div id="scanLine"></div>
           </div>
+
+          <!-- 🔥 Nuevo botón debajo del recuadro -->
+          <div id="takePicWrapper" class="hidden">
+            <button id="takePic">Tomar foto</button>
+          </div>
         </div>
+
 
 
 
@@ -315,10 +359,10 @@
         <input id="armax" type="range" min="2" max="20" value="8" step="0.5" />
 
         <div class="btns">
-          <button id="run" disabled>🚀 Procesar</button>
-          <button id="dlX" disabled>⬇️ Excel</button>
-          <button id="dlP" disabled>⬇️ PDF</button>
-          <button id="logout">🔓 Cerrar sesión</button>
+          <button id="run" disabled>Procesar</button>
+          <button id="dlX" disabled>Excel</button>
+          <button id="dlP" disabled>PDF</button>
+          <button id="logout">Cerrar sesión</button>
         </div>
       </div>
 
@@ -344,9 +388,19 @@ let imgEl = new Image();
 let last = null; // {summary, droplets, overlayDataURL, histImg}
 let videoStream = null;
 
-// ======== LOGIN ========
+
+// ======== LOGIN Y ADMINISTRACIÓN ========
+
+// Claves para almacenamiento
 const usersKey = "tinopal_users";
 const currentUserKey = "tinopal_current";
+
+// ✅ Siempre garantizar que el usuario admin exista
+let users = JSON.parse(localStorage.getItem(usersKey) || "[]");
+if (!users.some(u => u.user === "admin")) {
+  users.push({ user: "admin", pass: "admin123", role: "admin" });
+  localStorage.setItem(usersKey, JSON.stringify(users));
+}
 
 function loadUsers() {
   return JSON.parse(localStorage.getItem(usersKey) || "[]");
@@ -355,47 +409,48 @@ function saveUsers(u) {
   localStorage.setItem(usersKey, JSON.stringify(u));
 }
 
+// === LOGIN ===
+const userEl = $("user");
+const passEl = $("pass");
+const msgEl = $("loginMsg");
+
 document.getElementById("loginBtn").onclick = () => {
   const user = userEl.value.trim();
   const pass = passEl.value.trim();
-  if (user === "admin" && pass === "admin123") {
-    localStorage.setItem(currentUserKey, JSON.stringify({user, role:"admin"}));
-    showApp();
-  } else {
-    msgEl.textContent = "Usuario o clave incorrecta.";
-  }
-};
 
-document.getElementById("guestBtn").onclick = () => {
-  const user = prompt("Nombre visitante:");
-  if (!user) return;
   const users = loadUsers();
-  users.push({user, role:"guest"});
-  saveUsers(users);
-  localStorage.setItem(currentUserKey, JSON.stringify({user, role:"guest"}));
+  const found = users.find(u => u.user === user && u.pass === pass);
+
+  if (!found) {
+    msgEl.textContent = "Usuario o contraseña incorrectos.";
+    msgEl.style.color = "red";
+    return;
+  }
+
+  localStorage.setItem(currentUserKey, JSON.stringify(found));
   showApp();
 };
 
+// === LOGOUT ===
 document.getElementById("logout").onclick = () => {
   localStorage.removeItem(currentUserKey);
   document.getElementById("app").classList.add("hidden");
   document.getElementById("loginBox").classList.remove("hidden");
+  msgEl.textContent = "";
+  userEl.value = "";
+  passEl.value = "";
 };
 
-const userEl = document.getElementById("user");
-const passEl = document.getElementById("pass");
-const msgEl = document.getElementById("loginMsg");
-
+// === AUTOLOGIN ===
 if (localStorage.getItem(currentUserKey)) showApp();
 
 function showApp() {
   const current = JSON.parse(localStorage.getItem(currentUserKey) || "{}");
-  
-  // Mostrar la app y ocultar login
+
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
 
-  // Mostrar información del usuario
+  // Banner superior con usuario
   const banner = document.createElement("div");
   banner.id = "userBanner";
   banner.style = `
@@ -404,136 +459,168 @@ function showApp() {
     color: var(--secondary);
     margin-bottom: 10px;
   `;
-  banner.textContent = `Usuario: ${current.user} (${current.role === "admin" ? "Administrador" : "Visitante"})`;
+  banner.textContent = `Usuario: ${current.user} (${current.role})`;
   document.getElementById("app").prepend(banner);
 
-  // Mostrar panel de administración solo si es admin
   if (current.role === "admin") {
     showAdminPanel();
   } else {
     const existingPanel = document.getElementById("adminPanel");
-    if (existingPanel) existingPanel.remove(); // eliminar si existía
+    if (existingPanel) existingPanel.remove();
   }
 }
 
+// === PANEL DE ADMINISTRADOR ===
 function showAdminPanel() {
-  if (document.getElementById("adminPanel")) return; // evitar duplicados
+  if (document.getElementById("adminPanel")) return;
 
   const panel = document.createElement("div");
   panel.id = "adminPanel";
   panel.className = "card";
   panel.innerHTML = `
     <h3>Panel de Administración</h3>
-    <p>Usuarios visitantes registrados:</p>
-    <div id="userList"></div>
-    <div class="btns">
-      <button id="clearVisitors">Eliminar todos los visitantes</button>
-    </div>
-  `;
+    <p>Gestión de usuarios del sistema:</p>
 
-  // Insertar panel al inicio de la app
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <input id="newUser" type="text" placeholder="Nuevo usuario" style="flex:1;">
+      <input id="newPass" type="password" placeholder="Contraseña" style="flex:1;">
+      <button id="addUser">Crear usuario</button>
+    </div>
+
+    <div id="userList"></div>
+  `;
   document.querySelector("#app .row").prepend(panel);
 
-  $("clearVisitors").onclick = () => {
-    if (confirm("¿Eliminar todos los visitantes registrados?")) {
-      localStorage.setItem(usersKey, "[]");
-      updateUserList();
+  $("addUser").onclick = () => {
+    const u = $("newUser").value.trim();
+    const p = $("newPass").value.trim();
+
+    if (!u || !p) {
+      alert("Por favor ingresa usuario y contraseña.");
+      return;
     }
+
+    const users = loadUsers();
+    if (users.some(x => x.user === u)) {
+      alert("Ese usuario ya existe.");
+      return;
+    }
+
+    users.push({ user: u, pass: p, role: "operario" });
+    saveUsers(users);
+    $("newUser").value = "";
+    $("newPass").value = "";
+    updateUserList();
   };
 
   updateUserList();
 }
 
+// === ACTUALIZAR LISTA DE USUARIOS (versión profesional con ícono SVG) ===
 function updateUserList() {
-  const users = loadUsers().filter(u => u.role === "guest");
+  const users = loadUsers().filter(u => u.role !== "admin");
   const container = document.getElementById("userList");
-
-  if (!container) return; // seguridad
+  if (!container) return;
 
   if (!users.length) {
-    container.innerHTML = "<p class='mono'>No hay visitantes registrados.</p>";
+    container.innerHTML = "<p class='mono'>No hay usuarios registrados.</p>";
     return;
   }
 
   container.innerHTML = users.map((u, i) => `
-    <div class="visitor-row">
-      <span>${i + 1}. ${u.user}</span>
-      <button data-idx="${i}" class="delBtn">Eliminar</button>
+    <div style="
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:8px;
+      padding:10px 14px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:var(--card-bg);
+      box-shadow: var(--shadow);
+      flex-wrap:wrap;
+      gap:10px;
+    ">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px;">
+        <span style="font-weight:600;">${i + 1}.</span>
+        <span style="font-weight:600;">${u.user}</span>
+
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="password" id="passView${i}" value="${u.pass}" readonly
+            style="border:none; background:transparent; font-size:13px; color:#333; width:100px; text-align:center;">
+          <button class="eye-btn" id="togglePass${i}" title="Mostrar/Ocultar contraseña">
+            <svg class="eye-icon" id="iconEye${i}" viewBox="0 0 24 24">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <button data-idx="${i}" class="editBtn" style="white-space:nowrap;">Editar</button>
+        <button data-idx="${i}" class="delBtn" style="white-space:nowrap;">Eliminar</button>
+      </div>
     </div>
   `).join("");
 
-  container.querySelectorAll(".delBtn").forEach(btn => {
+
+
+  // Mostrar / ocultar contraseña (con ícono de ojo SVG)
+  container.querySelectorAll(".eye-btn").forEach(btn => {
+    btn.onclick = () => {
+      const idx = btn.id.replace("togglePass", "");
+      const input = document.getElementById(`passView${idx}`);
+      const svg = document.getElementById(`iconEye${idx}`);
+      if (input.type === "password") {
+        input.type = "text";
+        svg.innerHTML = '<path d="M2 2l20 20M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/>';
+      } else {
+        input.type = "password";
+        svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>';
+      }
+    };
+  });
+
+  // Editar contraseña
+  container.querySelectorAll(".editBtn").forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx);
       const all = loadUsers();
-      const guests = all.filter(u => u.role === "guest");
-      const toRemove = guests[idx];
-      const filtered = all.filter(u => !(u.user === toRemove.user && u.role === "guest"));
-      saveUsers(filtered);
-      updateUserList();
-    };
-  });
-}
-
-
-function showAdminPanel() {
-  // Crear contenedor si no existe
-  if (!document.getElementById("adminPanel")) {
-    const panel = document.createElement("div");
-    panel.id = "adminPanel";
-    panel.className = "card";
-    panel.innerHTML = `
-      <h3>🧰 Panel de Administración</h3>
-      <p>Usuarios visitantes registrados:</p>
-      <div id="userList"></div>
-      <div class="btns">
-        <button id="clearVisitors">🧹 Eliminar todos</button>
-      </div>
-    `;
-    document.querySelector("#app .row").prepend(panel);
-
-    $("clearVisitors").onclick = () => {
-      if (confirm("¿Eliminar todos los visitantes?")) {
-        localStorage.setItem(usersKey, "[]");
+      const nonAdmins = all.filter(u => u.role !== "admin");
+      const target = nonAdmins[idx];
+      const newPass = prompt(`Nueva contraseña para ${target.user}:`);
+      if (newPass) {
+        const updated = all.map(u =>
+          u.user === target.user ? { ...u, pass: newPass } : u
+        );
+        saveUsers(updated);
         updateUserList();
       }
     };
-  }
-  updateUserList();
-}
+  });
 
-function updateUserList() {
-  const users = loadUsers().filter(u => u.role === "guest");
-  const container = document.getElementById("userList");
-  if (!users.length) {
-    container.innerHTML = "<p class='mono'>No hay visitantes registrados.</p>";
-    return;
-  }
-  container.innerHTML = users.map((u, i) => `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-      <span>${i + 1}. ${u.user}</span>
-      <button data-idx="${i}" class="delBtn">🗑️</button>
-    </div>
-  `).join("");
-
+  // Eliminar usuario
   container.querySelectorAll(".delBtn").forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx);
       const all = loadUsers();
-      const guests = all.filter(u => u.role === "guest");
-      const toRemove = guests[idx];
-      const filtered = all.filter(u => !(u.user === toRemove.user && u.role === "guest"));
-      saveUsers(filtered);
-      updateUserList();
+      const nonAdmins = all.filter(u => u.role !== "admin");
+      const target = nonAdmins[idx];
+      if (confirm(`¿Eliminar usuario "${target.user}"?`)) {
+        const filtered = all.filter(u => u.user !== target.user);
+        saveUsers(filtered);
+        updateUserList();
+      }
     };
   });
 }
+
 
 
 // ======== ESTADO Y UTILIDADES ========
 function onOpenCvReady(){
   cvReady = true;
-  setStatus("OpenCV.js listo ✅", "ok");
   document.getElementById("run").disabled = false;
 }
 
@@ -564,7 +651,7 @@ $("file").addEventListener("change", (e)=>{
   const url = URL.createObjectURL(f);
   imgEl.onload = ()=>{
     drawToCanvas(imgEl, $("cIn"));
-    setStatus("Imagen cargada ✅", "ok");
+    setStatus("Imagen cargada", "ok");
     $("run").disabled = false; // 🔥 Activar botón procesar
   };
   imgEl.src = url;
@@ -600,7 +687,7 @@ $("openCam").onclick = async () => {
     $("cameraFrame").classList.remove("hidden");
     $("scanLine").style.display = "block";
 
-    $("takePic").disabled = false;
+    $("takePicWrapper").classList.remove("hidden"); 
     $("closeCam").disabled = false;
 
     setStatus("Cámara activa. Alinea la tarjeta dentro del recuadro azul.", "ok");
@@ -652,6 +739,7 @@ $("openCam").onclick = async () => {
     videoEl.classList.add("hidden");
     $("cameraFrame").classList.add("hidden");
     $("scanLine").style.display = "none";
+    $("takePicWrapper").classList.add("hidden");
     $("takePic").disabled = true;
     $("closeCam").disabled = true;
 
@@ -669,6 +757,7 @@ $("openCam").onclick = async () => {
     videoEl.classList.add("hidden");
     $("cameraFrame").classList.add("hidden");
     $("scanLine").style.display = "none";
+    $("takePicWrapper").classList.add("hidden");
     $("takePic").disabled = true;
     $("closeCam").disabled = true;
 
@@ -899,10 +988,9 @@ $("run").addEventListener("click", ()=>{
     $("dlX").disabled=false;
     $("dlP").disabled=false;
     [srcRGBA,srcBGR,hsv,low,high,mask,k,cc,stats,cent,outRGBA].forEach(m=>m.delete());
-    setStatus("Procesamiento terminado ✅","ok");
+    setStatus("Procesamiento terminado","ok");
   }catch(err){
     console.error(err);
-    setStatus("Error: "+(err?.message||err),"warn");
   }
 });
 
@@ -1028,7 +1116,7 @@ $("dlP").addEventListener("click", async ()=>{
     doc.setPage(i);
     doc.setFontSize(9);
     doc.setTextColor(130);
-    doc.text("Tinopal UV v2 – HidroReader Adaptado (solo navegador)", marginLeft, 820);
+    doc.text("Tinopal UV v2", marginLeft, 820);
     doc.text(`Página ${i} de ${pageCount}`, pageWidth - marginLeft - 60, 820);
   }
 
