@@ -198,23 +198,44 @@
     gap: 10px;
     margin-top: 12px;
     }
-        /* === Marco de encuadre para cámara === */
     #cameraWrapper {
       position: relative;
       display: inline-block;
+      width: 100%;
+      max-width: 600px;
+      margin-top: 10px;
     }
 
     #cameraFrame {
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 60%;
-      aspect-ratio: 76 / 26; /* relación exacta del folio */
-      border: 3px solid rgba(0, 128, 255, 0.8);
-      transform: translate(-50%, -50%);
-      pointer-events: none; /* no bloquea clics */
+      height: 70%;
+      aspect-ratio: 26 / 76;
+      border: 3px solid rgba(0, 128, 255, 0.9);
       border-radius: 6px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
     }
+
+    #scanLine {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(0, 255, 0, 0.7);
+      animation: scanMove 3s linear infinite;
+    }
+
+    @keyframes scanMove {
+      0% { top: 0%; }
+      100% { top: 100%; }
+    }
+
+
 
     </style>
 
@@ -251,10 +272,15 @@
           <button id="takePic" disabled>📷 Tomar foto</button>
           <button id="closeCam" disabled>❌ Cerrar cámara</button>
         </div>
-        <div id="cameraWrapper" style="width:100%; position:relative;">
+
+        <!-- Contenedor de cámara y recuadro escáner -->
+        <div id="cameraWrapper">
           <video id="video" class="hidden" autoplay playsinline></video>
-          <div id="cameraFrame" class="hidden"></div>
+          <div id="cameraFrame" class="hidden">
+            <div id="scanLine"></div>
+          </div>
         </div>
+
 
 
         <label>Dimensiones folio (mm)</label>
@@ -545,128 +571,110 @@ $("file").addEventListener("change", (e)=>{
 });
 
 
-// Mostrar marco al abrir cámara
+// ======== CÁMARA CON MARCO ESCÁNER ========
+
+// Mostrar cámara con recuadro azul
 $("openCam").onclick = async () => {
-    try {
-      const constraints = {
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        audio: false
-      };
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Este navegador no soporta acceso a la cámara.");
-        return;
-      }
-      videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-      const videoEl = $("video");
-      videoEl.srcObject = videoStream;
-      videoEl.classList.remove("hidden");
-      $("cameraFrame").classList.remove("hidden"); // 🔥 Muestra el recuadro guía
-      $("takePic").disabled = false;
-      $("closeCam").disabled = false;
-      setStatus("Cámara activa. Alinea la tarjeta dentro del recuadro.", "ok");
-    } catch (err) {
-      alert("No se pudo acceder a la cámara. Verifica permisos.");
+  try {
+    const constraints = {
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    };
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Este navegador no soporta acceso a la cámara.");
+      return;
     }
+
+    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const videoEl = $("video");
+    videoEl.srcObject = videoStream;
+    videoEl.play();
+
+    // Mostrar video + marco
+    videoEl.classList.remove("hidden");
+    $("cameraFrame").classList.remove("hidden");
+    $("scanLine").style.display = "block";
+
+    $("takePic").disabled = false;
+    $("closeCam").disabled = false;
+
+    setStatus("Cámara activa. Alinea la tarjeta dentro del recuadro azul.", "ok");
+
+  } catch (err) {
+    console.error("Error al acceder a la cámara:", err);
+    alert("No se pudo acceder a la cámara. Verifica los permisos o usa HTTPS.");
+  }
+};
+
+  // Capturar y recortar dentro del marco
+  $("takePic").onclick = () => {
+    const videoEl = $("video");
+    const canvasEl = $("cIn");
+    const frameEl = $("cameraFrame");
+
+    if (!videoEl.srcObject) {
+      alert("Activa la cámara antes de capturar una imagen.");
+      return;
+    }
+
+    const videoRect = videoEl.getBoundingClientRect();
+    const frameRect = frameEl.getBoundingClientRect();
+
+    const scaleX = videoEl.videoWidth / videoRect.width;
+    const scaleY = videoEl.videoHeight / videoRect.height;
+
+    const cropX = (frameRect.left - videoRect.left) * scaleX;
+    const cropY = (frameRect.top - videoRect.top) * scaleY;
+    const cropW = frameRect.width * scaleX;
+    const cropH = frameRect.height * scaleY;
+
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = cropW;
+    tempCanvas.height = cropH;
+    const ctx = tempCanvas.getContext("2d");
+    ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    canvasEl.width = cropW;
+    canvasEl.height = cropH;
+    canvasEl.getContext("2d").drawImage(tempCanvas, 0, 0, cropW, cropH);
+
+    // Detener cámara
+    const tracks = videoStream?.getTracks();
+    tracks?.forEach(t => t.stop());
+    videoEl.srcObject = null;
+
+    // Ocultar elementos
+    videoEl.classList.add("hidden");
+    $("cameraFrame").classList.add("hidden");
+    $("scanLine").style.display = "none";
+    $("takePic").disabled = true;
+    $("closeCam").disabled = true;
+
+    setStatus("Foto recortada correctamente ✅", "ok");
+    $("run").disabled = false;
   };
 
-  // Ocultar marco al cerrar o capturar
+  // Cerrar cámara manualmente
   $("closeCam").onclick = () => {
     const videoEl = $("video");
     const tracks = videoStream?.getTracks();
     tracks?.forEach(t => t.stop());
     videoEl.srcObject = null;
+
     videoEl.classList.add("hidden");
-    $("cameraFrame").classList.add("hidden"); // 🔥 Oculta el marco
+    $("cameraFrame").classList.add("hidden");
+    $("scanLine").style.display = "none";
     $("takePic").disabled = true;
     $("closeCam").disabled = true;
+
     setStatus("Cámara cerrada.", "warn");
   };
 
-  $("takePic").onclick = () => {
-    const videoEl = $("video");
-    const canvasEl = $("cIn");
-    if (!videoEl.srcObject) return;
-    canvasEl.width = videoEl.videoWidth;
-    canvasEl.height = videoEl.videoHeight;
-    const ctx = canvasEl.getContext("2d");
-    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-    const tracks = videoStream?.getTracks();
-    tracks?.forEach(t => t.stop());
-    videoEl.srcObject = null;
-    videoEl.classList.add("hidden");
-    $("cameraFrame").classList.add("hidden"); // 🔥 Oculta el marco al tomar foto
-    setStatus("Foto capturada correctamente ✅", "ok");
-    $("run").disabled = false;
-};
-
-
-// ======== CAPTURAR FOTO ========
-$("takePic").onclick = () => {
-  const videoEl = $("video");
-  const canvasEl = $("cIn");
-
-  if (!videoEl.srcObject) {
-    alert("Activa la cámara antes de capturar una imagen.");
-    return;
-  }
-
-  // Dibuja el frame del video al canvas
-  canvasEl.width = videoEl.videoWidth;
-  canvasEl.height = videoEl.videoHeight;
-  const ctx = canvasEl.getContext("2d");
-  ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-
-  // Detiene el video (opcional)
-  const tracks = videoStream?.getTracks();
-  tracks?.forEach(t => t.stop());
-  videoEl.srcObject = null;
-
-  videoEl.classList.add("hidden");
-  $("takePic").disabled = true;
-  $("closeCam").disabled = true;
-
-  setStatus("Foto capturada correctamente ✅", "ok");
-  $("run").disabled = false; // habilita el botón procesar
-};
-
-// ======== CERRAR CÁMARA ========
-$("closeCam").onclick = () => {
-  const videoEl = $("video");
-  const tracks = videoStream?.getTracks();
-  tracks?.forEach(t => t.stop());
-  videoEl.srcObject = null;
-  videoEl.classList.add("hidden");
-
-  $("takePic").disabled = true;
-  $("closeCam").disabled = true;
-  setStatus("Cámara cerrada.", "warn");
-};
-
-
-$("takePic").onclick = ()=>{
-  const v = $("video");
-  const c = $("cIn");
-  c.width = v.videoWidth;
-  c.height = v.videoHeight;
-  c.getContext("2d").drawImage(v,0,0,c.width,c.height);
-  setStatus("Foto capturada ✅", "ok");
-  $("run").disabled = false; // 🔥 Activar botón procesar
-};
-
-
-$("closeCam").onclick = ()=>{
-  if(videoStream){
-    videoStream.getTracks().forEach(t=>t.stop());
-    videoStream = null;
-  }
-  $("video").classList.add("hidden");
-  $("takePic").disabled = true;
-  $("closeCam").disabled = true;
-};
 
 // ======== FUNCIONES DE PROCESAMIENTO ========
 function drawToCanvas(img, canvas){
