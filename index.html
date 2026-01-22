@@ -414,51 +414,55 @@ let last = null; // {summary, droplets, overlayDataURL, histImg}
 let videoStream = null;
 
 
-// ======== LOGIN Y ADMINISTRACIÓN ========
+// ======== LOGIN Y ADMINISTRACIÓN (Firebase Firestore) ========
 
-// Claves para almacenamiento
-const usersKey = "tinopal_users";
-const currentUserKey = "tinopal_current";
+// Referencia a la colección de usuarios
+const usersRef = db.collection("usuarios");
 
-// ✅ Siempre garantizar que el usuario admin exista
-let users = JSON.parse(localStorage.getItem(usersKey) || "[]");
-if (!users.some(u => u.user === "admin")) {
-  users.push({ user: "admin", pass: "admin123", role: "admin" });
-  localStorage.setItem(usersKey, JSON.stringify(users));
+// Garantizar que el admin exista
+async function ensureAdminExists() {
+  const adminSnap = await usersRef.where("user", "==", "admin").get();
+  if (adminSnap.empty) {
+    await usersRef.add({ user: "admin", pass: "admin123", role: "admin" });
+    console.log("Usuario admin creado por defecto");
+  }
 }
-
-function loadUsers() {
-  return JSON.parse(localStorage.getItem(usersKey) || "[]");
-}
-function saveUsers(u) {
-  localStorage.setItem(usersKey, JSON.stringify(u));
-}
+ensureAdminExists();
 
 // === LOGIN ===
 const userEl = $("user");
 const passEl = $("pass");
 const msgEl = $("loginMsg");
 
-document.getElementById("loginBtn").onclick = () => {
+document.getElementById("loginBtn").onclick = async () => {
   const user = userEl.value.trim();
   const pass = passEl.value.trim();
 
-  const users = loadUsers();
-  const found = users.find(u => u.user === user && u.pass === pass);
+  if (!user || !pass) {
+    msgEl.textContent = "Por favor ingrese usuario y contraseña.";
+    msgEl.style.color = "red";
+    return;
+  }
 
-  if (!found) {
+  const snapshot = await usersRef
+    .where("user", "==", user)
+    .where("pass", "==", pass)
+    .get();
+
+  if (snapshot.empty) {
     msgEl.textContent = "Usuario o contraseña incorrectos.";
     msgEl.style.color = "red";
     return;
   }
 
-  localStorage.setItem(currentUserKey, JSON.stringify(found));
+  const userData = snapshot.docs[0].data();
+  localStorage.setItem("tinopal_current", JSON.stringify(userData));
   showApp();
 };
 
 // === LOGOUT ===
 document.getElementById("logout").onclick = () => {
-  localStorage.removeItem(currentUserKey);
+  localStorage.removeItem("tinopal_current");
   document.getElementById("app").classList.add("hidden");
   document.getElementById("loginBox").classList.remove("hidden");
   msgEl.textContent = "";
@@ -467,15 +471,13 @@ document.getElementById("logout").onclick = () => {
 };
 
 // === AUTOLOGIN ===
-if (localStorage.getItem(currentUserKey)) showApp();
+if (localStorage.getItem("tinopal_current")) showApp();
 
 function showApp() {
-  const current = JSON.parse(localStorage.getItem(currentUserKey) || "{}");
-
+  const current = JSON.parse(localStorage.getItem("tinopal_current") || "{}");
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
 
-  // Banner superior con usuario
   const banner = document.createElement("div");
   banner.id = "userBanner";
   banner.style = `
@@ -487,15 +489,11 @@ function showApp() {
   banner.textContent = `Usuario: ${current.user} (${current.role})`;
   document.getElementById("app").prepend(banner);
 
-  if (current.role === "admin") {
-    showAdminPanel();
-  } else {
-    const existingPanel = document.getElementById("adminPanel");
-    if (existingPanel) existingPanel.remove();
-  }
+  if (current.role === "admin") showAdminPanel();
+  else document.getElementById("adminPanel")?.remove();
 }
 
-// === PANEL DE ADMINISTRADOR ===
+// === PANEL ADMIN ===
 function showAdminPanel() {
   if (document.getElementById("adminPanel")) return;
 
@@ -516,7 +514,7 @@ function showAdminPanel() {
   `;
   document.querySelector("#app .row").prepend(panel);
 
-  $("addUser").onclick = () => {
+  $("addUser").onclick = async () => {
     const u = $("newUser").value.trim();
     const p = $("newPass").value.trim();
 
@@ -525,14 +523,13 @@ function showAdminPanel() {
       return;
     }
 
-    const users = loadUsers();
-    if (users.some(x => x.user === u)) {
+    const exists = await usersRef.where("user", "==", u).get();
+    if (!exists.empty) {
       alert("Ese usuario ya existe.");
       return;
     }
 
-    users.push({ user: u, pass: p, role: "operario" });
-    saveUsers(users);
+    await usersRef.add({ user: u, pass: p, role: "operario" });
     $("newUser").value = "";
     $("newPass").value = "";
     updateUserList();
@@ -541,16 +538,17 @@ function showAdminPanel() {
   updateUserList();
 }
 
-// === ACTUALIZAR LISTA DE USUARIOS (versión profesional con ícono SVG) ===
-function updateUserList() {
-  const users = loadUsers().filter(u => u.role !== "admin");
+// === LISTAR USUARIOS ===
+async function updateUserList() {
   const container = document.getElementById("userList");
-  if (!container) return;
+  const snapshot = await usersRef.where("role", "!=", "admin").get();
 
-  if (!users.length) {
+  if (snapshot.empty) {
     container.innerHTML = "<p class='mono'>No hay usuarios registrados.</p>";
     return;
   }
+
+  const users = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
   container.innerHTML = users.map((u, i) => `
     <div style="
@@ -569,29 +567,24 @@ function updateUserList() {
       <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px;">
         <span style="font-weight:600;">${i + 1}.</span>
         <span style="font-weight:600;">${u.user}</span>
-
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input type="password" id="passView${i}" value="${u.pass}" readonly
-            style="border:none; background:transparent; font-size:13px; color:#333; width:100px; text-align:center;">
-          <button class="eye-btn" id="togglePass${i}" title="Mostrar/Ocultar contraseña">
-            <svg class="eye-icon" id="iconEye${i}" viewBox="0 0 24 24">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
-        </div>
+        <input type="password" id="passView${i}" value="${u.pass}" readonly
+          style="border:none;background:transparent;font-size:13px;color:#333;width:100px;text-align:center;">
+        <button class="eye-btn" id="togglePass${i}" title="Mostrar/Ocultar contraseña">
+          <svg class="eye-icon" id="iconEye${i}" viewBox="0 0 24 24">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
       </div>
 
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-        <button data-idx="${i}" class="editBtn" style="white-space:nowrap;">Editar</button>
-        <button data-idx="${i}" class="delBtn" style="white-space:nowrap;">Eliminar</button>
+        <button data-id="${u.id}" class="editBtn">Editar</button>
+        <button data-id="${u.id}" class="delBtn">Eliminar</button>
       </div>
     </div>
   `).join("");
 
-
-
-  // Mostrar / ocultar contraseña (con ícono de ojo SVG)
+  // Mostrar/ocultar contraseñas
   container.querySelectorAll(".eye-btn").forEach(btn => {
     btn.onclick = () => {
       const idx = btn.id.replace("togglePass", "");
@@ -607,40 +600,29 @@ function updateUserList() {
     };
   });
 
-  // Editar contraseña
+  // Editar
   container.querySelectorAll(".editBtn").forEach(btn => {
-    btn.onclick = () => {
-      const idx = parseInt(btn.dataset.idx);
-      const all = loadUsers();
-      const nonAdmins = all.filter(u => u.role !== "admin");
-      const target = nonAdmins[idx];
-      const newPass = prompt(`Nueva contraseña para ${target.user}:`);
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      const newPass = prompt("Nueva contraseña:");
       if (newPass) {
-        const updated = all.map(u =>
-          u.user === target.user ? { ...u, pass: newPass } : u
-        );
-        saveUsers(updated);
+        await usersRef.doc(id).update({ pass: newPass });
         updateUserList();
       }
     };
   });
 
-  // Eliminar usuario
+  // Eliminar
   container.querySelectorAll(".delBtn").forEach(btn => {
-    btn.onclick = () => {
-      const idx = parseInt(btn.dataset.idx);
-      const all = loadUsers();
-      const nonAdmins = all.filter(u => u.role !== "admin");
-      const target = nonAdmins[idx];
-      if (confirm(`¿Eliminar usuario "${target.user}"?`)) {
-        const filtered = all.filter(u => u.user !== target.user);
-        saveUsers(filtered);
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      if (confirm("¿Eliminar este usuario?")) {
+        await usersRef.doc(id).delete();
         updateUserList();
       }
     };
   });
 }
-
 
 
 // ======== ESTADO Y UTILIDADES ========
