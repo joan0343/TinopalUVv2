@@ -285,6 +285,31 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <!-- Firebase SDK desde CDN -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // ⚙️ Configuración de tu proyecto Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyChQj3b25OBUTKp5r32fGnPiTZboRyJ4As",
+      authDomain: "tinopaluv.firebaseapp.com",
+      projectId: "tinopaluv",
+      storageBucket: "tinopaluv.firebasestorage.app",
+      messagingSenderId: "880065395775",
+      appId: "1:880065395775:web:353fb9f6ea692e9baecc8a",
+      measurementId: "G-LJYZ8X7DJ1"
+    };
+
+    // 🚀 Inicializar Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    // 🔄 Conectar a Firestore
+    const db = firebase.firestore();
+
+    // 🌍 Hacer accesible Firestore globalmente
+    window.db = db;
+  </script>
 </head>
 <body>
 
