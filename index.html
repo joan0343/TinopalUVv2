@@ -727,15 +727,33 @@ $("openCam").onclick = async () => {
     const cropW = frameRect.width * scaleX;
     const cropH = frameRect.height * scaleY;
 
+    // Canvas temporal para recorte
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = cropW;
     tempCanvas.height = cropH;
     const ctx = tempCanvas.getContext("2d");
     ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
+    // Dibujar imagen recortada en canvas principal
     canvasEl.width = cropW;
     canvasEl.height = cropH;
     canvasEl.getContext("2d").drawImage(tempCanvas, 0, 0, cropW, cropH);
+
+    // ======== GUARDAR AUTOMÁTICAMENTE EN GALERÍA ========
+    const now = new Date();
+    const filename = `TinopalUV_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}_${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}.jpg`;
+
+    tempCanvas.toBlob(blob => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(link.href);
+    }, "image/jpeg", 0.95);
 
     // Detener cámara
     const tracks = videoStream?.getTracks();
@@ -750,7 +768,7 @@ $("openCam").onclick = async () => {
     $("takePic").disabled = true;
     $("closeCam").disabled = true;
 
-    setStatus("Foto recortada correctamente ✅", "ok");
+    setStatus("Foto recortada y guardada correctamente", "ok");
     $("run").disabled = false;
   };
 
@@ -770,6 +788,7 @@ $("openCam").onclick = async () => {
 
     setStatus("Cámara cerrada.", "warn");
   };
+
 
 
 // ======== FUNCIONES DE PROCESAMIENTO ========
