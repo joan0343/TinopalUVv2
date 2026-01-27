@@ -470,8 +470,37 @@ document.getElementById("logout").onclick = () => {
   passEl.value = "";
 };
 
-// === AUTOLOGIN ===
-if (localStorage.getItem("tinopal_current")) showApp();
+
+// === AUTOLOGIN CON VALIDACIÓN EN FIRESTORE ===
+(async () => {
+  const stored = localStorage.getItem("tinopal_current");
+  if (!stored) return;
+
+  try {
+    const current = JSON.parse(stored);
+
+    // Verificar que el usuario aún exista en Firestore
+    const snap = await usersRef
+      .where("user", "==", current.user)
+      .where("role", "==", current.role)
+      .get();
+
+    if (snap.empty) {
+      // Usuario eliminado → cerrar sesión forzado
+      localStorage.removeItem("tinopal_current");
+      console.warn("Sesión invalidada: usuario eliminado");
+      return;
+    }
+
+    // Usuario válido → continuar
+    showApp();
+
+  } catch (err) {
+    console.error("Error validando sesión:", err);
+    localStorage.removeItem("tinopal_current");
+  }
+})();
+
 
 function showApp() {
   const current = JSON.parse(localStorage.getItem("tinopal_current") || "{}");
