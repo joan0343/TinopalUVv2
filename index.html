@@ -412,6 +412,7 @@ let cvReady = false;
 let imgEl = new Image();
 let last = null; // {summary, droplets, overlayDataURL, histImg}
 let videoStream = null;
+let sessionUnsubscribe = null;
 
 
 // ======== LOGIN Y ADMINISTRACIÓN (Firebase Firestore) ========
@@ -462,13 +463,39 @@ document.getElementById("loginBtn").onclick = async () => {
 
 // === LOGOUT ===
 document.getElementById("logout").onclick = () => {
+
+  // 🔥 CANCELAR LISTENER EN TIEMPO REAL
+  if (sessionUnsubscribe) {
+    sessionUnsubscribe();
+    sessionUnsubscribe = null;
+  }
+
   localStorage.removeItem("tinopal_current");
+
   document.getElementById("app").classList.add("hidden");
   document.getElementById("loginBox").classList.remove("hidden");
+
   msgEl.textContent = "";
   userEl.value = "";
   passEl.value = "";
 };
+
+function forceLogout() {
+  if (sessionUnsubscribe) {
+    sessionUnsubscribe();
+    sessionUnsubscribe = null;
+  }
+
+  localStorage.removeItem("tinopal_current");
+
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+
+  $("loginMsg").textContent = "Tu sesión ha sido cerrada por el administrador.";
+  $("loginMsg").style.color = "red";
+
+  console.log("Sesión cerrada automáticamente");
+}
 
 
 // === AUTOLOGIN CON VALIDACIÓN EN FIRESTORE ===
@@ -504,8 +531,15 @@ document.getElementById("logout").onclick = () => {
 
 function showApp() {
   const current = JSON.parse(localStorage.getItem("tinopal_current") || "{}");
+
+  if (!current.user || !current.role) return;
+
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
+
+  // Banner usuario
+  const oldBanner = document.getElementById("userBanner");
+  if (oldBanner) oldBanner.remove();
 
   const banner = document.createElement("div");
   banner.id = "userBanner";
@@ -518,9 +552,26 @@ function showApp() {
   banner.textContent = `Usuario: ${current.user} (${current.role})`;
   document.getElementById("app").prepend(banner);
 
-  if (current.role === "admin") showAdminPanel();
-  else document.getElementById("adminPanel")?.remove();
+  if (current.role === "admin") {
+    showAdminPanel();
+  } else {
+    document.getElementById("adminPanel")?.remove();
+  }
+
+  // 🔥 LISTENER EN TIEMPO REAL (CLAVE)
+  if (sessionUnsubscribe) sessionUnsubscribe();
+
+  sessionUnsubscribe = usersRef
+    .where("user", "==", current.user)
+    .where("role", "==", current.role)
+    .onSnapshot(snapshot => {
+      if (snapshot.empty) {
+        console.warn("Usuario eliminado → cierre de sesión inmediato");
+        forceLogout();
+      }
+    });
 }
+
 
 // === PANEL ADMIN ===
 function showAdminPanel() {
